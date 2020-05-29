@@ -209,6 +209,8 @@
             </div>
 
             <div class="control_selector_wrapper">
+                カメラ：
+                <select id="select_camera" onchange="updateCamera()"></select>
                 音声認識：
                 <select id="select_language" class="selector" onchange="updateCountry()"></select>
                 <select id="select_dialect" class="selector" onchange="updateLanguage()"></select>
@@ -247,6 +249,9 @@
     </div>
 </body>
 
+<!-- Chrome で MediaDevices.enumerateDevices() を動かすためのpolyfill -->
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
 <script>
     // ブラウザ判定
     // 参考: https://qiita.com/sakuraya/items/33f93e19438d0694a91d
@@ -284,6 +289,45 @@
         const err = new Error('getUserMedia()が使用できません');
         alert(`${err.name} ${err.message}`);
         throw err;
+    }
+
+    // select要素のoptionをクリアする
+    function clearSelect(select) {
+        while(select.firstChild) {
+            select.removeChild(select.firstChild);
+        }
+    }
+
+    // select要素のoptionに、option.valueがvalueな項目があれば選択する
+    function selectValueIfExists(select, value) {
+        if (value === null || value === undefined) return;
+        select.childNodes.forEach(n => {
+            if (n.value === value) {
+                select.value = value;
+            }
+        })
+    }
+
+    // カメラを列挙して select_camera オブジェクトの option に設定
+    // 参考：https://github.com/webrtc/samples/blob/gh-pages/src/content/devices/input-output/js/main.js
+    // deviceInfos : MediaDeviceInfo[]
+    // 引数は MediaDevices.enumerateDevices() の戻り値の Promise の中身という前提
+    // 参考：https://developer.mozilla.org/ja/docs/Web/API/MediaDevices/enumerateDevices
+    function updateCameraSelector(deviceInfos) {
+        // 選んだ項目を最後で再度選ぶために記憶
+        const selectedDevice = select_camera.value;
+        // 既存の選択肢をクリア
+        clearSelect(select_camera);
+        // メディアデバイス一覧のうち、videoinputをoption要素としてselectに追加
+        for (let i=0 ; i !== deviceInfos.length ; ++i) {
+            if (deviceInfos[i].kind === 'videoinput') {
+                const option = document.createElement('option');
+                option.text = deviceInfos[i].label || `camera ${select_camera.length + 1}`;
+                select_camera.appendChild(option);
+            }
+        }
+        // 元々選んでいた項目があれば、その項目を再度選択
+        selectValueIfExists(select_camera);
     }
 
     const $video = document.getElementById('result_video');  // 映像表示エリア
@@ -794,6 +838,8 @@
         document.querySelector('#select_font').addEventListener('change', updateConfigValue);
         document.querySelector('#checkbox_timestamp').addEventListener('input', function(e) {updateConfig(e.target.id, e.target.checked)});
         document.querySelector('#checkbox_hiragana').addEventListener('input', function(e) {updateConfig(e.target.id, e.target.checked)});
+
+        updateCameraSelector();
     }
 
     function updateConfig(key, value) {
