@@ -210,7 +210,7 @@
 
             <div class="control_selector_wrapper">
                 カメラ：
-                <select id="select_camera" onchange="updateCamera()"></select>
+                <select id="select_camera" onchange="setupCamera()"></select>
                 音声認識：
                 <select id="select_language" class="selector" onchange="updateCountry()"></select>
                 <select id="select_dialect" class="selector" onchange="updateLanguage()"></select>
@@ -291,6 +291,8 @@
         throw err;
     }
 
+    const $video = document.getElementById('result_video');  // 映像表示エリア
+
     // select要素のoptionをクリアする
     function clearSelect(select) {
         while(select.firstChild) {
@@ -330,15 +332,43 @@
         selectValueIfExists(select_camera);
     }
 
-    const $video = document.getElementById('result_video');  // 映像表示エリア
+    // video要素にstreamを設定し、メディア（カメラ、マイク）一覧を返す
+    // 参考：https://github.com/webrtc/samples/blob/gh-pages/src/content/devices/input-output/js/main.js
+    function handleStream(stream) {
+        $video.srcObject = stream;
+        return navigator.mediaDevices.enumerateDevices();
+    }
 
-    navigator.mediaDevices.getUserMedia({ video: { aspectRatio: { exact: 1.7777777778 } }, audio: false })
-        .then(stream => $video.srcObject = stream)
-        .catch(err => {
-            alert(`カメラ映像を読み込めませんでした。ブラウザのアクセス制限など，設定を確認してください`);
-            document.getElementById('help_on_error').style.display='block';
-        });
+    // 設定に基づきカメラ映像を表示
+    // 参考：https://github.com/webrtc/samples/blob/gh-pages/src/content/devices/input-output/js/main.js
+    function setupCamera() {
+        if (window.stream) {
+            window.stream.getTracks().forEach(track => {
+                track.stop();
+            });
+        }
+        const videoSource = select_camera.value;
+        console.log(videoSource);
+        const constraints = {
+            video: {
+                aspectRatio: { exact: 1.7777777778 },
+                deviceId: videoSource ? {exact: videoSource} : undefined
+            },
+            audio: false
+        };
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(handleStream)
+            .then(updateCameraSelector)
+            .catch(onCameraError);
+    }
 
+    function onCameraError(err) {
+        console.log(`カメラ関連の問題：${err.name} / ${err.message}`)
+        alert(`カメラ映像を読み込めませんでした。ブラウザのアクセス制限など，設定を確認してください`);
+        document.getElementById('help_on_error').style.display='block';
+    }
+
+    setupCamera();
 
     // 音声認識
     // 参考: https://jellyware.jp/kurage/iot/webspeechapi.html
